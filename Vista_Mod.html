@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailTriage Pro - Dashboard de Inteligencia de Amenazas</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuración para usar la fuente Inter y colores personalizados -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e5e7eb; /* Gris claro para fondo corporativo */
+        }
+        .tag-critical { background-color: #dc2626; } /* red-600 */
+        .tag-phishing { background-color: #f59e0b; } /* amber-500 */
+        .tag-malware { background-color: #1d4ed8; } /* blue-700 */
+        .card-shadow { box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); }
+    </style>
+</head>
+<body class="p-4 md:p-10">
+
+    <div class="max-w-7xl mx-auto">
+
+        <!-- Header -->
+        <header class="mb-8 border-b pb-4 border-gray-300">
+            <h1 class="text-4xl font-extrabold text-gray-800 flex items-center mb-1">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-red-600 mr-3" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm-1-12a1 1 0 102 0V9a1 1 0 10-2 0V6zm0 5a1 1 0 102 0 1 1 0 00-2 0z" clip-rule="evenodd" />
+                </svg>
+                MailTriage Pro: Inteligencia de Amenazas
+            </h1>
+            <p class="text-xl text-gray-600">Vista de Administrador: Análisis de Riesgo Colectivo</p>
+        </header>
+
+        <!-- Sección de Métricas de Riesgo (Ahora 5 columnas) -->
+        <!-- Se usa grid-cols-5 o se adapta el layout para que se vean bien las 5 tarjetas -->
+        <section class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 lg:gap-6 mb-10">
+
+            <!-- Métrica 1: Detecciones de Alto Riesgo -->
+            <div class="bg-white p-4 lg:p-6 rounded-xl card-shadow border-l-4 border-red-600">
+                <p class="text-sm font-semibold text-red-600 uppercase">Alertas Críticas (24h)</p>
+                <p class="text-3xl lg:text-4xl font-bold text-gray-900 mt-1">19</p>
+                <p class="text-xs text-gray-500 mt-2">Emails de riesgo potencial bloqueados.</p>
+            </div>
+
+            <!-- Métrica 2: Falsos Negativos (Precisión) -->
+            <div class="bg-white p-4 lg:p-6 rounded-xl card-shadow border-l-4 border-emerald-600">
+                <p class="text-sm font-semibold text-emerald-600 uppercase">Eficacia de Bloqueo</p>
+                <p class="text-3xl lg:text-4xl font-bold text-gray-900 mt-1">96.7%</p>
+                <p class="text-xs text-gray-500 mt-2">Precisión en la clasificación de Phishing/Spam.</p>
+            </div>
+            
+            <!-- NUEVA MÉTRICA: Intentos Erróneos de Ingreso -->
+            <div class="bg-white p-4 lg:p-6 rounded-xl card-shadow border-l-4 border-orange-500">
+                <p class="text-sm font-semibold text-orange-600 uppercase">Intentos de Suplantación (Revisión)</p>
+                <p class="text-3xl lg:text-4xl font-bold text-gray-900 mt-1">5</p>
+                <p class="text-xs text-gray-500 mt-2">Accesos erróneos inusuales (IP/ubicación desconocida).</p>
+            </div>
+
+            <!-- Métrica 3: Empleados Afectados -->
+            <div class="bg-white p-4 lg:p-6 rounded-xl card-shadow border-l-4 border-yellow-600">
+                <p class="text-sm font-semibold text-yellow-600 uppercase">Usuarios con Exposición</p>
+                <p class="text-3xl lg:text-4xl font-bold text-gray-900 mt-1">7</p>
+                <p class="text-xs text-gray-500 mt-2">Empleados utilizaron una nueva contraseña vulnerable</p>
+            </div>
+
+            <!-- Métrica 4: Dominios Nuevos Detectados -->
+            <div class="bg-white p-4 lg:p-6 rounded-xl card-shadow border-l-4 border-indigo-600">
+                <p class="text-sm font-semibold text-indigo-600 uppercase">Nuevos Dominios Maliciosos</p>
+                <p class="text-3xl lg:text-4xl font-bold text-gray-900 mt-1">3</p>
+                <p class="text-xs text-gray-500 mt-2">Dominios detectados por primera vez por el modelo de MailTriage Pro</p>
+            </div>
+        </section>
+
+        <!-- Contenedor Principal: Feed de Alertas y Generador de Recomendaciones -->
+        <section class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Columna 1: Feed de Alertas de Riesgo -->
+            <div class="lg:col-span-2 bg-white p-6 rounded-xl card-shadow">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Feed de Alertas de Alto Riesgo (Pendientes de Acción)</h2>
+                
+                <div id="alerts-feed" class="space-y-4">
+
+                    <!-- Nueva Alerta: Revisión de Suplantación (Conecta con la métrica) -->
+                    <div class="flex items-start p-4 bg-orange-50 border border-orange-300 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-orange-600 mr-3 flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 003 14h14a1 1 0 00.707-1.707l-.707-.707V8a6 6 0 00-6-6zM5 15h10v1H5v-1z" />
+                        </svg>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="bg-orange-500 text-white px-3 py-0.5 text-xs rounded-full font-bold">ALERTA DE ACCESO</span>
+                                <span class="text-xs text-gray-500">hace 10 min</span>
+                            </div>
+                            <p class="font-bold text-gray-900">ACCIÓN REQUERIDA: Revise 5 Intentos de Ingreso Erróneos Inusuales</p>
+                            <p class="text-sm text-gray-600">**Patrón:** Falla de autenticación desde nueva IP/Ubicación desconocida. Posible ataque de suplantación. **Prioridad:** Media.</p>
+                        </div>
+                    </div>
+
+                    <!-- Alerta 1: Phishing Urgente (Facturación) -->
+                    <div class="flex items-start p-4 bg-red-50 border border-red-300 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-red-600 mr-3 flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M8.257 3.34A1 1 0 019.5 3h1a1 1 0 01.743.345l4.358 4.359a1 1 0 01.305.727V15a1 1 0 01-1 1h-12a1 1 0 01-1-1V8.432a1 1 0 01.305-.727L8.257 3.34zM10 8a3 3 0 11-6 0 3 3 0 016 0z" clip-rule="evenodd" />
+                        </svg>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="tag-phishing text-white px-3 py-0.5 text-xs rounded-full font-bold">PHISHING CRÍTICO</span>
+                                <span class="text-xs text-gray-500">hace 30 min</span>
+                            </div>
+                            <p class="font-bold text-gray-900">Asunto: PAGO VENCIDO - [FACTURA-4567] | Requiere Acceso Inmediato</p>
+                            <p class="text-sm text-gray-600">**Patrón:** Suplantación de identidad de proveedor de servicios (IP externa/link acortado). **Afectados:** 4 usuarios (Contabilidad y Finanzas).</p>
+                        </div>
+                    </div>
+
+                    <!-- Alerta 2: Malware (Adjunto desconocido) -->
+                    <div class="flex items-start p-4 bg-blue-50 border border-blue-300 rounded-lg">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-blue-600 mr-3 flex-shrink-0 mt-1" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9 9a1 1 0 000 2h2a1 1 0 100-2H9z" clip-rule="evenodd" />
+                        </svg>
+                        <div class="flex-grow">
+                            <div class="flex justify-between items-center mb-1">
+                                <span class="tag-malware text-white px-3 py-0.5 text-xs rounded-full font-bold">MALWARE/ADJUNTO</span>
+                                <span class="text-xs text-gray-500">hace 5h</span>
+                            </div>
+                            <p class="font-bold text-gray-900">Asunto: Nuevo Reglamento de IT | Archivo: reglamento.zip</p>
+                            <p class="text-sm text-gray-600">**Patrón:** Adjunto inusual (.zip con ejecutable) de un remitente interno con dominio externo. **Afectados:** 1 usuario (RR.HH.).</p>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Columna 2: Generador de Recomendaciones -->
+            <div class="lg:col-span-1 bg-white p-6 rounded-xl card-shadow">
+                <h2 class="text-xl font-semibold text-gray-700 mb-4">Generador de Comunicado de Seguridad</h2>
+                
+                <p class="text-sm text-gray-600 mb-4">Utiliza la IA para generar una recomendación basada en las alertas recientes.</p>
+
+                <div class="mb-4">
+                    <label for="alert-type" class="block text-sm font-medium text-gray-700 mb-1">Alerta a comunicar:</label>
+                    <select id="alert-type" class="w-full border-gray-300 rounded-lg p-2.5 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="phishing-invoice">Phishing de Facturación</option>
+                        <option value="malware-zip">Adjunto Malicioso (.zip)</option>
+                        <option value="password-reset">Ataque de Phishing de Contraseña</option>
+                    </select>
+                </div>
+
+                <div class="mb-4">
+                    <label for="audience" class="block text-sm font-medium text-gray-700 mb-1">Audiencia:</label>
+                    <select id="audience" class="w-full border-gray-300 rounded-lg p-2.5 shadow-sm focus:ring-indigo-500 focus:border-indigo-500">
+                        <option value="finance">Equipo de Finanzas</option>
+                        <option value="all-employees">Todos los Empleados</option>
+                        <option value="it-only">Solo Equipo de IT</option>
+                    </select>
+                </div>
+                <!-- onclick="generateRecommendation()" -->
+                <button id="generate-recommendation-btn" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-2.5 rounded-lg shadow-md transition-colors">
+                    Generar Recomendación de Seguridad
+                </button>
+
+                <!-- Área de resultado de la IA -->
+                <div id="recommendation-output" class="mt-6 p-4 bg-gray-100 border border-gray-300 rounded-lg hidden">
+                    <p class="font-semibold text-gray-800 mb-2">Recomendación generada:</p>
+                    <textarea id="recommendation-text" rows="6" readonly class="w-full p-2 border border-gray-300 rounded-lg text-sm bg-gray-50"></textarea>
+                </div>
+            </div>
+
+        </section>
+
+    </div>
+
+    <!-- Script para simular la generación de la recomendación -->
+    <script>
+        function generateRecommendation() {
+            const alertType = document.getElementById('alert-type').value;
+            const audience = document.getElementById('audience').value;
+            const outputDiv = document.getElementById('recommendation-output');
+            const outputTextarea = document.getElementById('recommendation-text');
+            
+            outputDiv.classList.remove('hidden');
+
+            // Simulación del contenido generado por la IA
+            let subject = "";
+            let body = "";
+
+            if (alertType === 'phishing-invoice') {
+                subject = "ALERTA CRÍTICA: Intento de Phishing de Facturación Detectado";
+                body = `Estimado equipo de ${audience === 'finance' ? 'Finanzas' : 'Empleados'},\n\nHemos detectado una oleada de correos de Phishing sofisticados que simulan ser facturas vencidas (Patrón: FACTURA-4567).\n\nInstrucción Inmediata: Nunca hagan clic en enlaces de pago ni descarguen archivos adjuntos de facturas no verificadas. Confirmen siempre por teléfono con el proveedor antes de cualquier acción.\n\nEl sistema MailTriage Pro ha bloqueado ${alertType === 'phishing-invoice' ? 12 : 0} alertas en las últimas 24 horas. Manténgase vigilante.`;
+            } else if (alertType === 'malware-zip') {
+                subject = "AVISO DE SEGURIDAD: Archivos .zip Inusuales";
+                body = `Estimado equipo,\n\nSe ha detectado un intento de distribución de malware a través de archivos adjuntos inusuales (.zip, .exe). El correo simulaba ser sobre "Nuevo Reglamento de IT".\n\nInstrucción Inmediata: Elimine cualquier correo con un archivo .zip que no haya solicitado. El contenido oficial siempre se distribuye a través de Google Drive o SharePoint.\n\nGracias por su cooperación.`;
+            } else if (alertType === 'password-reset') {
+                subject = "ALERTA URGENTE: Ataque de Fatiga de MFA Activo";
+                body = `Estimado equipo,\n\nEstamos experimentando un ataque de fatiga de MFA. Si recibe solicitudes de restablecimiento de contraseña que NO solicitó, NUNCA haga clic en "Aceptar" o "Restablecer".\n\nAcción: Si su cuenta lo requiere, cambie su contraseña inmediatamente a través del portal oficial.`;
+            }
+
+            outputTextarea.value = `ASUNTO: ${subject}\n\nCUERPO DEL MENSAJE:\n${body}`;
+        }
+    </script>
+
+</body>
+</html>
