@@ -1,0 +1,579 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MailTriage Pro - Bandeja de Entrada Triageada</title>
+    <!-- Carga de Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Configuración para usar la fuente Inter y colores corporativos -->
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;500;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f3f4f6; /* Fondo de la aplicación */
+            height: 100vh;
+            overflow: hidden; /* Evita scroll principal */
+        }
+        /* Colores adaptados a las etiquetas ACCIONABLES (Azul), INFORMATIVAS (Gris), RIESGO (Rojo) */
+        .tag-acciones { background-color: #1d4ed8; } /* blue-700 */
+        .tag-informativo { background-color: #6b7280; } /* gray-500 */
+        .tag-riesgo { background-color: #dc2626; } /* red-600 */
+        .sidebar { min-width: 200px; }
+        .inbox-list { min-width: 350px; }
+        .inbox-item {
+            transition: background-color 0.2s;
+            border-left: 5px solid transparent;
+        }
+        .inbox-item.clickable {
+            cursor: pointer;
+        }
+        /* Estilo para los ítems no clickeables (RIESGO en Bandeja de Entrada) */
+        .inbox-item.disabled-risk {
+            cursor: not-allowed;
+            opacity: 0.6;
+            background-color: #fef2f2; /* red-50 */
+        }
+        .inbox-item.selected {
+            background-color: #e5e7eb; /* Fondo de ítem seleccionado */
+            font-weight: 600;
+        }
+        .inbox-item:hover.clickable {
+            background-color: #f3f4f6;
+        }
+        /* Color del indicador de triage */
+        .triage-indicator-acciones { background-color: #1d4ed8; }
+        .triage-indicator-informativo { background-color: #6b7280; }
+        .triage-indicator-riesgo { background-color: #dc2626; }
+        
+        /* Colores de las nuevas etiquetas de proyecto */
+        .tag-jira { background-color: #2563eb; } /* blue-600 */
+        .tag-colombia { background-color: #059669; } /* emerald-600 */
+        .tag-teams { background-color: #9333ea; } /* violet-600 */
+        .tag-interno { background-color: #f97316; } /* orange-500 */
+        .triage-indicator-jira { background-color: #2563eb; }
+        .triage-indicator-colombia { background-color: #059669; }
+        .triage-indicator-teams { background-color: #9333ea; }
+        
+        .sidebar-link.active {
+            background-color: #e5e7eb;
+            font-weight: 700;
+        }
+    </style>
+</head>
+<body class="flex flex-col">
+
+    <!-- Navbar/Toolbar Superior (Mock) -->
+    <div class="bg-white border-b border-gray-200 p-2 flex items-center justify-between flex-shrink-0">
+        <div class="flex items-center">
+             <!-- Logo/Título de la Aplicación -->
+            <h1 class="text-xl font-bold text-gray-800 flex items-center ml-2">
+                <span class="text-blue-700 mr-2">MT</span> MailTriage Pro
+            </h1>
+        </div>
+        <div class="flex items-center space-x-3 text-sm text-gray-600">
+            <!-- Funciones de Toolbar (Mock) -->
+            <button class="flex items-center p-2 rounded hover:bg-gray-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 0012 4.582V4m-7 5a8.001 8.001 0 0015.356 2m-1.889-1.889a2 2 0 10-2.828 2.828L12 17l-3.356-3.356a2 2 0 10-2.828 2.828L11.172 19H12a8 8 0 10-9.757-4.257l.006-.006H3z" /></svg>
+                Archivar
+            </button>
+            <button class="flex items-center p-2 rounded hover:bg-gray-100">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                Eliminar
+            </button>
+        </div>
+    </div>
+
+    <!-- Contenedor Principal de la Aplicación (Flex para layout de 3 columnas) -->
+    <div class="flex flex-grow h-full">
+
+        <!-- Columna 1: Barra Lateral de Navegación (Triage y Proyectos) -->
+        <div class="sidebar bg-white border-r border-gray-200 p-4 flex-shrink-0 hidden md:block overflow-y-auto">
+            <button class="bg-blue-600 text-white w-full py-2 rounded-lg font-medium mb-4 hover:bg-blue-700 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 inline mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                Correo Nuevo
+            </button>
+            
+            <div class="space-y-1 text-gray-700">
+                <!-- Bandeja de Entrada (DEFAULT: Todos) -->
+                <div id="nav-all" class="p-2 flex items-center justify-between rounded-lg font-semibold bg-gray-100 sidebar-link active" onclick="filterTriage('all', this)">
+                    Bandeja de Entrada <span class="text-xs bg-gray-300 px-2 rounded-full">198</span>
+                </div>
+                
+                <!-- ACCIONES (MOVIMIENTO DE PESTAÑA A NAVEGACIÓN LATERAL) -->
+                <div id="nav-acciones" class="p-2 flex items-center justify-between rounded-lg hover:bg-gray-100 sidebar-link" onclick="filterTriage('acciones', this)">
+                    ACCIONES <span class="text-xs bg-blue-600 text-white px-2 rounded-full">3</span>
+                </div>
+
+                <div class="p-2 rounded-lg hover:bg-gray-100">Elementos Enviados</div>
+                <div class="p-2 rounded-lg hover:bg-gray-100">Archivados</div>
+            </div>
+
+            <!-- RIESGO POTENCIAL (Carpeta de Seguridad) -->
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm font-bold text-red-600 uppercase mb-2">Seguridad</p>
+                <div id="nav-riesgo" class="p-2 flex items-center justify-between rounded-lg hover:bg-red-50 cursor-pointer sidebar-link" onclick="filterTriage('riesgo', this)">
+                    <span class="text-red-600 font-semibold">RIESGO POTENCIAL</span>
+                    <span class="text-xs bg-red-600 text-white px-2 rounded-full">3</span>
+                </div>
+            </div>
+
+            <!-- CARPETAS INTELIGENTES (Proyectos y Etiquetas) -->
+            <div class="mt-4 pt-4 border-t border-gray-200">
+                <p class="text-sm font-bold text-blue-700 uppercase mb-2">Etiquetas Inteligentes</p>
+                <div class="space-y-1 text-gray-700">
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-blue-50 cursor-pointer">
+                        <span class="triage-indicator-jira w-2 h-2 rounded-full mr-2"></span> Proyecto JIRA
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">12</span>
+                    </div>
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-emerald-50 cursor-pointer">
+                        <span class="triage-indicator-colombia w-2 h-2 rounded-full mr-2"></span> Proyecto Colombia
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">15</span>
+                    </div>
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-purple-50 cursor-pointer">
+                        <span class="triage-indicator-teams w-2 h-2 rounded-full mr-2"></span> Microsoft Teams
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">22</span>
+                    </div>
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-orange-50 cursor-pointer">
+                        <span class="triage-indicator-teams w-2 h-2 rounded-full mr-2 bg-orange-500"></span> Interno
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">18</span>
+                    </div>
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-gray-50 cursor-pointer">
+                        <span class="triage-indicator-informativo w-2 h-2 rounded-full mr-2"></span> Sugerencia Clasificación
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">91</span>
+                    </div>
+                    <!-- Característica de MailTriage: Silencio Inteligente -->
+                    <div class="p-2 flex items-center justify-between rounded-lg hover:bg-gray-100">
+                        <span class="text-gray-500 font-bold">Silencio Inteligente</span>
+                        <span class="text-xs bg-gray-200 px-2 rounded-full">37</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- BOTÓN: Informar otro Riesgo -->
+            <div class="mt-6 pt-4 border-t border-gray-200">
+                <button class="flex items-center w-full justify-center bg-gray-800 text-white py-2 rounded-lg font-medium text-sm hover:bg-gray-700 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd" />
+                    </svg>
+                    Informar otro Riesgo
+                </button>
+            </div>
+        </div>
+
+        <!-- Columna 2: Lista de Correos (Inbox List) - Dinámica -->
+        <div class="inbox-list bg-white border-r border-gray-200 flex-grow overflow-y-auto">
+            
+            <div class="p-4 border-b border-gray-200">
+                <!-- Mensaje fijo sobre el Silencio Inteligente -->
+                <div id="alert-message" class="mb-2 p-3 rounded-lg text-sm bg-blue-50 text-blue-800 hidden"></div>
+                <p class="text-sm text-gray-500">La IA ha movido 37 correos a Silencio Inteligente. Tienes 3 acciones pendientes.</p>
+            </div>
+
+            <!-- Contenedor de Correos Triageados -->
+            <div id="email-list">
+                
+                <!-- Email 1: ACCIONES & JIRA (CRÍTICO) -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start clickable" data-category="acciones" onclick="selectEmail(this, 'acciones')">
+                    <div class="triage-indicator-acciones w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-gray-800 text-sm">Ana Torres (Gerencia)</span>
+                            <div class="flex space-x-2">
+                                <span class="tag-acciones text-white px-2 py-0.5 text-xs rounded-full font-bold">ACCIONES</span>
+                                <span class="tag-jira text-white px-2 py-0.5 text-xs rounded-full font-bold">JIRA</span>
+                            </div>
+                        </div>
+                        <p class="font-medium text-gray-900 mt-1 truncate">URGENTE: Aprobación de Contrato #45</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">Necesito tu firma en las cláusulas de pago antes de las 3 PM.</p>
+                    </div>
+                </div>
+                
+                <!-- Email 2: NUEVA ACCIÓN: Aprobación de Vacaciones -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start clickable" data-category="acciones" onclick="selectEmail(this, 'acciones_vacaciones')">
+                    <div class="triage-indicator-acciones w-1 h-14 rounded mr-3"></div> 
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-800 text-sm">Recursos Humanos (Interno)</span>
+                            <div class="flex space-x-2">
+                                <span class="tag-acciones text-white px-2 py-0.5 text-xs rounded-full font-bold">ACCIONES</span>
+                                <span class="tag-interno text-white px-2 py-0.5 text-xs rounded-full font-bold">INTERNO</span>
+                            </div>
+                        </div>
+                        <p class="font-medium text-gray-900 mt-1 truncate">Solicitud de Aprobación de Vacaciones - Juan Pérez</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">Pendiente tu visto bueno para el periodo vacacional.</p>
+                    </div>
+                </div>
+
+                <!-- Email 3: RIESGO POTENCIAL (NO CLICKABLE en vista ALL) -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start disabled-risk" data-category="riesgo" data-mock-id="riesgo">
+                    <div class="triage-indicator-riesgo w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-red-700 text-sm">Soporte IT (Alerta)</span>
+                            <span class="tag-riesgo text-white px-2 py-0.5 text-xs rounded-full font-bold">RIESGO POTENCIAL</span>
+                        </div>
+                        <p class="font-bold text-red-800 mt-1 truncate">ALERTA: Su Contraseña Expirará HOY - Click AQUÍ</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">RESTRINGIDO. Contenido de riesgo reportado y aislado.</p>
+                    </div>
+                </div>
+                
+                <!-- Email 4: ACCIONES & COLOMBIA -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start clickable" data-category="acciones" onclick="selectEmail(this, 'acciones_colombia')">
+                    <div class="triage-indicator-acciones w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-800 text-sm">María Paz (Soporte)</span>
+                            <div class="flex space-x-2">
+                                <span class="tag-acciones text-white px-2 py-0.5 text-xs rounded-full font-bold">ACCIONES</span>
+                                <span class="tag-colombia text-white px-2 py-0.5 text-xs rounded-full font-bold">COLOMBIA</span>
+                            </div>
+                        </div>
+                        <p class="font-medium text-gray-900 mt-1 truncate">Necesito el documento de requisitos del cliente de Bogotá</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">El cliente está esperando la confirmación de la entrega final.</p>
+                    </div>
+                </div>
+
+                <!-- Email 5: RIESGO POTENCIAL (NUEVO: CEO FRAUD - MAYÚSCULAS) -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start disabled-risk" data-category="riesgo" data-mock-id="riesgo_jefe">
+                    <div class="triage-indicator-riesgo w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-red-700 text-sm">CEO [Jefe de la empresa]</span>
+                            <span class="tag-riesgo text-white px-2 py-0.5 text-xs rounded-full font-bold">RIESGO POTENCIAL</span>
+                        </div>
+                        <p class="font-bold text-red-800 mt-1 truncate">PAGO PENDIENTE PARA VIAJE: TRANSFIERE 7000 USD A ESTA CUENTA HOY</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">RESTRINGIDO. Suplantación de identidad detectada (BOSS Fraud).</p>
+                    </div>
+                </div>
+                
+                <!-- Email 6: INFORMATIVO & TEAMS (Muestra un correo que no es ACCIONABLE) -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start clickable" data-category="informativo" onclick="selectEmail(this, 'informativo_teams')">
+                    <div class="triage-indicator-informativo w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-medium text-gray-800 text-sm">Microsoft Teams Notificación</span>
+                            <div class="flex space-x-2">
+                                <span class="tag-informativo text-white px-2 py-0.5 text-xs rounded-full font-bold">INFORMATIVO</span>
+                                <span class="tag-teams text-white px-2 py-0.5 text-xs rounded-full font-bold">TEAMS</span>
+                            </div>
+                        </div>
+                        <p class="font-medium text-gray-900 mt-1 truncate">Tienes 3 menciones sin leer en el canal 'Desarrollo'</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">El proceso de respaldo de Q3 ha finalizado correctamente.</p>
+                    </div>
+                </div>
+
+                <!-- Email 7: RIESGO POTENCIAL (Lotería) -->
+                <div class="inbox-item p-4 border-b border-gray-100 flex items-start disabled-risk" data-category="riesgo" data-mock-id="riesgo_premio">
+                    <div class="triage-indicator-riesgo w-1 h-14 rounded mr-3"></div>
+                    <div class="flex-grow">
+                        <div class="flex justify-between items-center">
+                            <span class="font-bold text-red-700 text-sm">Lotería VIP (No es de la empresa)</span>
+                            <span class="tag-riesgo text-white px-2 py-0.5 text-xs rounded-full font-bold">RIESGO POTENCIAL</span>
+                        </div>
+                        <p class="font-bold text-red-800 mt-1 truncate">¡Ganaste $10,000! Haz click para reclamar tu premio</p>
+                        <p class="text-xs text-gray-500 mt-1 truncate">RESTRINGIDO. Contenido de riesgo reportado y aislado.</p>
+                    </div>
+                </div>
+                
+            </div>
+        </div>
+
+        <!-- Columna 3: Panel de Lectura (Simulación) -->
+        <div id="reading-panel" class="flex-grow bg-white p-6 border-l border-gray-200 overflow-y-auto hidden sm:block">
+            <div id="reading-content">
+                <!-- El contenido se inyecta aquí -->
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        // --- MOCKS DE CONTENIDO ---
+        const emailMocks = {
+            'acciones': {
+                subject: "Urgente: Aprobación de Contrato #45 (Requiere firma)",
+                from: "Ana Torres (Gerencia)",
+                time: "Ayer, 14:30",
+                triage: "ACCIONES",
+                project: "JIRA",
+                description: "La IA detectó una solicitud de aprobación de documentos de alta jerarquía. Prioridad: ALTA.",
+                body: `<p>Estimado/a, te envío el contrato final para el cliente XYZ, el cual adjunto, junto con un resumen de los puntos clave del acuerdo.</p>
+                       <p>Es crucial que lo revises y lo firmes digitalmente antes de las 3 PM de hoy para poder proceder con el lanzamiento del proyecto. El cliente ha estado esperando esta confirmación final.</p>
+                       <p>Las cláusulas de pago ya han sido revisadas por nuestro equipo legal, pero necesito tu visto bueno final. Puedes encontrar el documento adjunto o en este enlace seguro:</p>
+                       <a href="#" class="text-blue-600 hover:underline">https://secure-docs.empresa.com/contrato-xyz-45</a>
+                       <p>Cualquier duda sobre la estructura del contrato o los plazos, por favor, me llamas. ¡Gracias por tu gestión!</p>
+                       <p>Saludos,<br>Ana Torres, Gerente de Proyectos</p>`
+            },
+            'acciones_colombia': {
+                subject: "Necesito el documento de requisitos del cliente de Bogotá",
+                from: "María Paz (Soporte)",
+                time: "Hoy, 10:00",
+                triage: "ACCIONES",
+                project: "Proyecto Colombia",
+                description: "La IA identificó una tarea de soporte urgente relacionada con el Proyecto Colombia. Prioridad: MEDIA.",
+                body: `<p>Hola, necesito urgentemente el documento de requisitos del cliente de Bogotá para preparar la sesión de QA. ¿Puedes enviármelo o indicarme dónde lo subiste?</p>
+                       <p>El cliente está en línea esperando la confirmación de la entrega. Es un requisito del proyecto Colombia, que debe ser completado antes del viernes.</p>
+                       <p>Gracias por tu ayuda.</p>
+                       <p>Saludos,<br>María Paz</p>`
+            },
+            'acciones_vacaciones': {
+                subject: "Solicitud de Aprobación de Vacaciones - Juan Pérez",
+                from: "Recursos Humanos (Interno)",
+                time: "Hoy, 09:15",
+                triage: "ACCIONES",
+                project: "Interno",
+                description: "Pendiente tu visto bueno para el periodo vacacional de un subalterno. Prioridad: ALTA.",
+                body: `<p>Estimado/a, se adjunta la solicitud de vacaciones de Juan Pérez, de tu equipo, para el periodo del 1 al 15 de diciembre.</p>
+                       <p>Por favor, revisa la disponibilidad del equipo durante ese periodo y aprueba o rechaza la solicitud a través del sistema de RR.HH. o respondiendo a este correo con tu confirmación.</p>
+                       <p>Gracias.</p>
+                       <p>Saludos,<br>Equipo de Recursos Humanos</p>`
+            },
+            'informativo_teams': {
+                subject: "Tienes 3 menciones sin leer en el canal 'Desarrollo'",
+                from: "Microsoft Teams Notificación",
+                time: "Hace 5h",
+                triage: "INFORMATIVO",
+                project: "Microsoft Teams",
+                description: "Notificación automática del sistema Teams. No requiere respuesta por correo, la acción es en otra plataforma.",
+                body: `<p>Hola, tienes 3 nuevas menciones en Microsoft Teams en el canal #Desarrollo. Puedes ver la conversación haciendo clic aquí:</p>
+                       <a href="#" class="text-blue-600 hover:underline">Ir a Microsoft Teams</a>
+                       <p>Este es un correo automático. Por favor, no respondas a este correo.</p>`
+            },
+            'riesgo': {
+                subject: "ALERTA: Su Contraseña Expirará MANANA - Haga Click AQUÍ",
+                from: "Soporte IT (Alerta)",
+                time: "Hace 1h",
+                triage: "RIESGO POTENCIAL",
+                project: "N/A",
+                description: "!!!PELIGRO!!! El modelo de IA detectó que el remitente es una suplantación de identidad (Phishing). NO INTERACTUAR.",
+                body: `<p class="text-red-600 font-bold">!!!! ADVERTENCIA CRÍTICA DE MAILTRIAGE PRO !!!!</p>
+                       <p>Este correo ha sido etiquetado como **RIESGO POTENCIAL** debido a un dominio sospechoso y lenguaje que genera pánico (Ingeniería Social).</p>
+                       <p>La IA ha bloqueado los enlaces. Por favor, reporta este correo al equipo de IT. Nunca uses enlaces dentro de correos para cambiar contraseñas; ve siempre al portal oficial.</p>
+                       <p>--</p>
+                       <p class="text-gray-500">Contenido Original:</p>
+                       <p>Estimado usuario, su cuenta expirará en 2 horas debido a una violación de seguridad. Por favor, haga clic en el siguiente enlace para validar su identidad y evitar la suspensión:</p>
+                       <p><a href="#" class="text-gray-400 cursor-not-allowed">[ENLACE BLOQUEADO POR MAILTRIAGE PRO]</a></p>`
+            },
+            'riesgo_premio': {
+                subject: "¡Ganaste $10,000! Haz click para reclamar tu premio",
+                from: "Lotería VIP (No es de la empresa)",
+                time: "Hace 5h",
+                triage: "RIESGO POTENCIAL",
+                project: "N/A",
+                description: "!!!PELIGRO!!! Correo no corporativo con promesas financieras inusuales. Intento de fishing obvio.",
+                body: `<p class="text-red-600 font-bold">!!!! ADVERTENCIA CRÍTICA DE MAILTRIAGE PRO !!!!</p>
+                       <p>Este correo ha sido etiquetado como **RIESGO POTENCIAL**. Por favor, no interactúe con el contenido ni los enlaces.</p>
+                       <p>--</p>
+                       <p class="text-gray-500">Contenido Original:</p>
+                       <p>¡FELICIDADES! Fuiste seleccionado como el ganador de nuestro sorteo anual. Para reclamar tu premio de $10,00s, solo debes completar este formulario antes de la medianoche:</p>
+                       <p><a href="#" class="text-gray-400 cursor-not-allowed">[ENLACE BLOQUEADO POR MAILTRIAGE PRO]</a></p>`
+            },
+            'riesgo_jefe': { // NUEVO CORREO DE RIESGO
+                subject: "PAGO PENDIENTE URGENTE: TRANSFIERE 5000 USD A ESTA CUENTA HOY",
+                from: "CEO (Jefe de la empresa) [nombre.jefe.extranio@hotmail.com]",
+                time: "Hace 15 min",
+                triage: "RIESGO POTENCIAL",
+                project: "N/A",
+                description: "!!!!PELIGRO!!!! Correo de Suplantación de la Dirección (CEO Fraud). El uso de MAYÚSCULAS y urgencia es una táctica de ataque.",
+                body: `<p class="text-red-600 font-bold">!!!! ALERTA DE SUPLANTACIÓN (CEO FRAUD) DE MAILTRIAGE PRO !!!!</p>
+                       <p>Este correo ha sido etiquetado como **RIESGO POTENCIAL** debido a la suplantación de identidad del CEO. El dominio del remitente no es corporativo y el tono es inusualmente urgente y autoritario.</p>
+                       <p>La IA ha bloqueado los enlaces. **NO RESPONDA NI REALICE TRANSFERENCIAS.** Contacte al CEO por un canal verificado (teléfono o Teams).</p>
+                       <p>--</p>
+                       <p class="text-gray-500">Contenido Original:</p>
+                       <p>NECESITO QUE PROCESES UN PAGO URGENTE A ESTE PROVEEDOR ANTES DE QUE CIERRE EL BANCO. LA CUENTA ES [XXX-YYY-ZZZ]. ESTO ES CONFIDENCIAL. DIME CUANDO ESTÉ HECHO.</p>`
+            },
+            'default': {
+                 subject: "MailTriage Pro",
+                 from: "¡Selecciona un correo!",
+                 time: "",
+                 triage: "",
+                 project: "",
+                 description: "",
+                 body: `<div class="text-center text-gray-500 mt-16">Selecciona un elemento de la lista para leer el contenido y ver el análisis de Triage de la IA.</div>`
+            },
+            'default_riesgo': {
+                 subject: "RIESGO POTENCIAL: Amenazas Reportadas",
+                 from: "Equipo de Ciberseguridad",
+                 time: "",
+                 triage: "RIESGO POTENCIAL",
+                 project: "N/A",
+                 description: "Estos correos han sido aislados por la IA de MailTriage Pro. Se recomienda no abrirlos. Ya han sido reportados al Equipo de Seguridad.",
+                 body: `<div class="text-center text-red-600 mt-16">
+                            <h3 class="text-xl font-bold mb-4">!!!! ATENCIÓN: RIESGO POTENCIAL AISLADO !!!!</h3>
+                            <p class="text-gray-600">El contenido de este correo es una amenaza conocida (Phishing/Malware) y ha sido aislado automáticamente.</p>
+                            <p class="text-gray-600 font-semibold mt-2">Ya fue informado al equipo de seguridad.</p>
+                            <p class="text-sm mt-4 text-gray-500">No hay acciones requeridas de su parte. El acceso al contenido ha sido bloqueado para su protección.</p>
+                        </div>`
+            }
+        };
+
+        let currentSelectedEmail = 'acciones'; 
+
+        // --- FUNCIONES DE INTERFAZ ---
+        function updateReadingPanel(emailData) {
+            const content = document.getElementById('reading-content');
+            const data = emailData || emailMocks[currentSelectedEmail];
+            const isRisky = data.triage === 'RIESGO POTENCIAL';
+            
+            // Determinar si es un correo de riesgo y la vista actual es RIESGO
+            const isRiskView = document.querySelector('#nav-riesgo').classList.contains('active');
+            
+            // Si el correo es de RIESGO, mostramos el contenido de riesgo por defecto (seguro)
+            if (isRisky) {
+                content.innerHTML = emailMocks.default_riesgo.body;
+                return;
+            } 
+
+            // Contenido normal (Acciones, Informativo)
+            content.innerHTML = `
+                <!-- Contenido simulado del correo seleccionado -->
+                <h2 class="text-2xl font-bold text-gray-900 mb-2">${data.subject}</h2>
+                <div class="flex items-center space-x-3 text-sm text-gray-500 mb-4 pb-4 border-b">
+                    <span>De: ${data.from}</span>
+                    <span>Para: Yo</span>
+                    <span>${data.time}</span>
+                </div>
+                
+                <!-- Bloque de Triage de MailTriage Pro -->
+                <div class="p-3 rounded-lg mb-6 bg-blue-100 border border-blue-300">
+                    <p class="font-bold text-blue-800 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                        [MailTriage Pro] Etiqueta Asignada: ${data.triage}
+                        ${data.project ? `<span class="ml-3 font-semibold text-xs py-0.5 px-2 rounded-full ${data.project === 'JIRA' ? 'bg-blue-300' : data.project === 'Proyecto Colombia' ? 'bg-emerald-300' : data.project === 'Microsoft Teams' ? 'bg-purple-300' : 'bg-orange-300'}">${data.project}</span>` : ''}
+                    </p>
+                    <p class="text-sm text-blue-800 mt-1">${data.description}</p>
+                </div>
+
+                <!-- Contenido Original -->
+                <div class="prose max-w-none text-gray-800">
+                    ${data.body}
+                </div>
+
+                <!-- Simulación de la herramienta de Personalización (Feedback para la IA) -->
+                <div class="mt-8 pt-4 border-t border-gray-200">
+                    <p class="text-sm font-semibold text-gray-700 mb-2">¿Fue Correcta esta clasificación?</p>
+                    <div class="flex space-x-3">
+                        <button class="bg-emerald-500 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-emerald-600 transition-colors">Sí, es ${data.triage}</button>
+                        <button class="bg-gray-300 text-gray-800 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-400 transition-colors">No, debería ser INFORMATIVO</button>
+                    </div>
+                </div>
+            `;
+        }
+        
+        function selectEmail(element, mockId) {
+            // Previene el click si es un correo de riesgo
+            if (element.classList.contains('disabled-risk')) {
+                updateReadingPanel(emailMocks.default_riesgo);
+                return;
+            }
+
+            document.querySelectorAll('.inbox-item').forEach(item => {
+                item.classList.remove('selected');
+                item.style.borderLeftColor = 'transparent';
+            });
+            element.classList.add('selected');
+            element.style.borderLeftColor = '#1d4ed8'; // Resalta el borde azul al seleccionar
+            currentSelectedEmail = mockId;
+            updateReadingPanel(emailMocks[mockId]);
+        }
+        
+        function filterTriage(category, element) {
+            const emails = document.querySelectorAll('.inbox-item');
+            const alertBox = document.getElementById('alert-message');
+            
+            // 1. Limpiar la selección de la barra lateral y establecer 'active'
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            element.classList.add('active');
+
+            // 2. Control de visibilidad de correos y comportamiento de click
+            emails.forEach(email => {
+                const emailCategory = email.getAttribute('data-category');
+                
+                email.style.display = 'none'; // Ocultar por defecto
+                email.classList.add('clickable');
+                email.classList.remove('disabled-risk');
+
+                if (category === 'all') {
+                    email.style.display = 'flex';
+                    if (emailCategory === 'riesgo') {
+                        // Deshabilitar click para riesgo en vista ALL (solo visual)
+                        email.classList.remove('clickable');
+                        email.classList.add('disabled-risk');
+                    }
+                } else if (category === 'acciones' && emailCategory === 'acciones') {
+                    email.style.display = 'flex';
+                } else if (category === 'riesgo' && emailCategory === 'riesgo') {
+                    email.style.display = 'flex';
+                    // El contenido de riesgo es siempre no interactivo
+                    email.classList.remove('clickable'); 
+                }
+            });
+
+            // 3. Mostrar el mensaje de Riesgo o Silencio
+            if (category === 'riesgo') {
+                alertBox.classList.remove('hidden', 'bg-blue-50', 'text-blue-800');
+                alertBox.classList.add('bg-red-100', 'text-red-700');
+                alertBox.innerHTML = '⚠️ **Ya fue informado a seguridad.** Estos correos están aislados para su protección. No intente abrirlos.';
+                // Seleccionar el mensaje por defecto de riesgo
+                updateReadingPanel(emailMocks.default_riesgo);
+
+            } else {
+                alertBox.classList.add('hidden'); // Ocultar mensaje en otras vistas
+                // Seleccionar el primer correo visible o el default
+                const firstVisibleEmail = document.querySelector('.inbox-item[style*="display: flex"]');
+                if (firstVisibleEmail) {
+                    // Cargar el contenido si es clickeable
+                    if(firstVisibleEmail.classList.contains('clickable')) {
+                        selectEmail(firstVisibleEmail, firstVisibleEmail.getAttribute('data-category') === 'riesgo' ? firstVisibleEmail.getAttribute('data-mock-id') : firstVisibleEmail.getAttribute('data-category'));
+                    } else {
+                        // Si el primero visible no es clickeable (ej. riesgo), se muestra el default_riesgo
+                        updateReadingPanel(emailMocks.default_riesgo);
+                    }
+                } else {
+                    updateReadingPanel(emailMocks.default);
+                }
+            }
+        }
+
+        // Inicializar la vista (muestra la Bandeja de Entrada - vista ALL - por defecto)
+        window.onload = () => {
+            // Asegurarse de que Bandeja de Entrada esté activa y muestre TODOS
+            document.querySelectorAll('.sidebar-link').forEach(link => {
+                link.classList.remove('active');
+            });
+            document.getElementById('nav-all').classList.add('active');
+            
+            // Ocultar la barra de alertas al inicio
+            document.getElementById('alert-message').classList.add('hidden');
+
+            const emails = document.querySelectorAll('.inbox-item');
+             emails.forEach(email => {
+                const emailCategory = email.getAttribute('data-category');
+                email.style.display = 'flex';
+                
+                // Deshabilitar riesgo en vista ALL
+                if (emailCategory === 'riesgo') {
+                    email.classList.remove('clickable');
+                    email.classList.add('disabled-risk');
+                } else {
+                    email.classList.add('clickable');
+                }
+            });
+
+            // Carga el contenido del primer correo ACCIONES
+            const firstActionableEmail = document.querySelector('.inbox-item[data-category="acciones"]');
+            if (firstActionableEmail) {
+                 selectEmail(firstActionableEmail, 'acciones');
+                 firstActionableEmail.style.borderLeftColor = '#1d4ed8';
+            } else {
+                updateReadingPanel(emailMocks.default);
+            }
+           
+        };
+    </script>
+
+</body>
+</html>
